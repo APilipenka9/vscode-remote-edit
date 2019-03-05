@@ -17,6 +17,29 @@ export function activate(context: vscode.ExtensionContext) {
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
 	let disposable = vscode.commands.registerCommand('extension.openRemote', async () => {
+		let host;
+		let user;
+		let rootDir;
+
+		const configuration = vscode.workspace.getConfiguration("remote");
+		if (!configuration.has("host")) {
+			host = await vscode.window.showInputBox({
+				prompt: "Enter a host name"
+			}) as string;
+		}
+		else {
+			host = configuration.get("host") as string;
+		}
+		if (!configuration.has("user")) {
+			user = await vscode.window.showInputBox({
+				prompt: "Enter user name"
+			}) as string;
+		}
+		else {
+			user = configuration.get("user") as string;
+		}
+		rootDir = configuration.get("rootDir", "~");
+
 		const input = await vscode.window.showInputBox({
 				prompt: "Enter a path to remote file"
 		});
@@ -27,10 +50,6 @@ export function activate(context: vscode.ExtensionContext) {
 		const pathIsAbsolute = isAbsolute(remotePath);
 		console.log(`Remote path is ${remotePath}`);
 
-		const configuration = vscode.workspace.getConfiguration("remote");
-		const host = configuration.get("host") as string;
-		const user = configuration.get("user") as string;
-		const rootDir = configuration.get("rootDir");
 		let remoteFilePath = 
 			pathIsAbsolute ? remotePath : `${rootDir}/${remotePath}`;
 		console.log(`Host is ${host}`);
@@ -61,7 +80,12 @@ export function activate(context: vscode.ExtensionContext) {
 			mkdirIfNotExist(localDir);
 		}
 
-		await getFromRemote(host, user, localDir, remoteFilePath);
+		try {
+			await getFromRemote(host, user, localDir, remoteFilePath);
+		} catch (error) {
+			vscode.window.showErrorMessage(error);
+			return;
+		}
 
 		const localPath = path.join(localDir, filename);
 		await vscode.workspace.openTextDocument(localPath);
@@ -82,7 +106,7 @@ async function getFromRemote(host: string, user: string,	localDir: string,
 
 function notify(message: string) {
 	console.log(message);
-	vscode.window.showInformationMessage(message);
+	//vscode.window.showInformationMessage(message);
 }
 
 function mkdirIfNotExist(dirname: string) {
