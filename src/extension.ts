@@ -1,7 +1,9 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
-const client: any = require("scp2");
+import * as fs from "fs";
+import * as path from "path";
+const sshClient: any = require("node-sshclient");
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -15,29 +17,55 @@ export function activate(context: vscode.ExtensionContext) {
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
 	let disposable = vscode.commands.registerCommand('extension.openRemote', async () => {
-		/*const remotePath = await vscode.window.showInputBox({prompt: "Enter a path to remote file"});
+		const input = await vscode.window.showInputBox({
+				prompt: "Enter a path to remote file"
+		});
+		if (!input) {
+			return;
+		}
+		const remotePath = input as string;
+		const pathIsAbsolute = isAbsolute(remotePath);
 		console.log(`Remote path is ${remotePath}`);
 
 		const configuration = vscode.workspace.getConfiguration("remote");
-		const host = configuration.get("host");
-		const user = configuration.get("user");
+		const host = configuration.get("host") as string;
+		const user = configuration.get("user") as string;
 		const rootDir = configuration.get("rootDir");
+		let remoteFilePath = 
+			pathIsAbsolute ? remotePath : `${rootDir}/${remotePath}`;
 		console.log(`Host is ${host}`);
 		console.log(`User is ${user}`);
 		console.log(`Remote root directory is ${rootDir}`);
-		console.log(configuration);*/
 
-		const localPath = vscode.env.appRoot;
-		const remotePath = "/u/ts6227/test/BRMSTSKA";
-		const host = "dvlp";
-		const user = "ts6227";
+		const workspaceDir = vscode.workspace.rootPath as string;
 
-		client.scp(localPath, {host: host, username: user, path: remotePath}, (err: any) => {
-				console.log(err);
-				vscode.window.showInformationMessage(err);
-		});
+		const relativeRemoteDir = splitRemotePath(remotePath).dirname;
+		const filename = splitRemotePath(remotePath).filename;
+		let localDir;
+		if (pathIsAbsolute) {
+			const chosen = await vscode.window.showOpenDialog({
+				canSelectFiles: false,
+				canSelectFolders: true,
+				canSelectMany: false
+			});
+			if (!chosen) {
+				return;
+			}
+			else {
+				localDir = (chosen as vscode.Uri[])[0].fsPath;
+				notify(`localDir = ${localDir}`);
+			}
+		}
+		else {
+			localDir = path.join(workspaceDir, relativeRemoteDir);
+			mkdirIfNotExist(localDir);
+		}
 
-		vscode.workspace.openTextDocument(localPath);
+		await getFromRemote(host, user, localDir, remoteFilePath);
+
+		const localPath = path.join(localDir, filename);
+		await vscode.workspace.openTextDocument(localPath);
+		notify("Opened");
 	});
 
 	context.subscriptions.push(disposable);
@@ -45,3 +73,57 @@ export function activate(context: vscode.ExtensionContext) {
 
 // this method is called when your extension is deactivated
 export function deactivate() {}
+
+async function getFromRemote(host: string, user: string,	localDir: string,
+		remoteFile: string) {
+	await download(host, user, localDir, remoteFile);
+
+}
+
+function notify(message: string) {
+	console.log(message);
+	vscode.window.showInformationMessage(message);
+}
+
+function mkdirIfNotExist(dirname: string) {
+	if (!fs.existsSync(dirname)) {
+		fs.mkdirSync(dirname, {recursive: true});
+	}
+}
+
+function download(host: string, user: string, localDir: string,
+	remoteFile: string) {
+		const scp = new sshClient.SCP({hostname: host, user: user});
+		return new Promise((resolve, reject) => {
+			scp.download(remoteFile, localDir, (result: any) => {
+				notify("result = " + result);
+				if (result.exitCode === 0) {
+					resolve(result.stdout);
+				}
+				else {
+					reject(result.stderr);
+				}
+			});
+		});
+}
+
+function isAbsolute(path: string) {
+	return path.startsWith("/");
+}
+
+interface Path {
+	dirname: string,
+	filename: string
+}
+
+function splitRemotePath(pathStr: string): Path {
+	const lastPathSepIndex = pathStr.lastIndexOf("/");
+	const dirname = pathStr.slice(0, lastPathSepIndex);
+	notify(`dirname = ${dirname}`);
+	const filename = pathStr.substr(lastPathSepIndex + 1);
+	notify(`filename = ${filename}`);
+	return {
+		dirname: dirname,
+		filename: filename
+	}
+}
