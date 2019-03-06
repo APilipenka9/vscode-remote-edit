@@ -142,12 +142,18 @@ interface Path {
 
 function splitRemotePath(pathStr: string): Path {
 	const lastPathSepIndex = pathStr.lastIndexOf("/");
-	const dirname = pathStr.slice(0, lastPathSepIndex);
-	notify(`dirname = ${dirname}`);
-	const filename = pathStr.substr(lastPathSepIndex + 1);
-	notify(`filename = ${filename}`);
-	return {
-		dirname: dirname,
-		filename: filename
+	if (lastPathSepIndex >= 0) {
+		const dirname = pathStr.slice(0, lastPathSepIndex);
+		const filename = pathStr.substr(lastPathSepIndex + 1);
+		return {
+			dirname: dirname,
+			filename: filename
+		}
+	}
+	else {
+		return {
+			dirname: "",
+			filename: pathStr
+		}
 	}
 }
