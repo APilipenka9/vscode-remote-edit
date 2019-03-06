@@ -88,7 +88,8 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 
 		const localPath = path.join(localDir, filename);
-		await vscode.workspace.openTextDocument(localPath);
+		const document = await vscode.workspace.openTextDocument(localPath);
+		await vscode.window.showTextDocument(document, {preview: false});
 		notify("Opened");
 	});
 
