@@ -94,6 +94,12 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	context.subscriptions.push(disposable);
+
+	disposable = vscode.commands.registerCommand("extension.uploadToRemote", () => {
+		notify("Upload To Remote");
+	});
+
+	context.subscriptions.push(disposable);
 }
 
 // this method is called when your extension is deactivated
@@ -107,7 +113,7 @@ async function getFromRemote(host: string, user: string,	localDir: string,
 
 function notify(message: string) {
 	console.log(message);
-	//vscode.window.showInformationMessage(message);
+	vscode.window.showInformationMessage(message);
 }
 
 function mkdirIfNotExist(dirname: string) {

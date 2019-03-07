@@ -19,8 +19,20 @@
 				"command": "extension.openRemote",
 				"title": "Open Remote File",
 				"category": "Remote Edit"
+			},
+			{
+				"command": "extension.uploadToRemote",
+				"title": "Upload To Remote",
+				"category": "Remote Edit"
 			}
-		]
+		],
+		"menus": {
+			"editor/title": [
+				{
+					"command": "extension.uploadToRemote"
+				}
+			]
+		}
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
