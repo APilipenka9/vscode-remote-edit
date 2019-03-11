@@ -3,7 +3,12 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
+import { TextDecoder } from "util";
 const sshClient: any = require("node-sshclient");
+
+// Messages
+const ASK_FOR_HOST = "Enter host name: ";
+const ASK_FOR_USER = "Enter user name: ";
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -17,27 +22,14 @@ export function activate(context: vscode.ExtensionContext) {
 	// Now provide the implementation of the command with registerCommand
 	// The commandId parameter must match the command field in package.json
 	let disposable = vscode.commands.registerCommand('extension.openRemote', async () => {
-		let host;
-		let user;
-		let rootDir;
+		let host: string;
+		let user: string;
+		let rootDir: string;
 
 		const configuration = vscode.workspace.getConfiguration("remote");
-		if (!configuration.has("host")) {
-			host = await vscode.window.showInputBox({
-				prompt: "Enter a host name"
-			}) as string;
-		}
-		else {
-			host = configuration.get("host") as string;
-		}
-		if (!configuration.has("user")) {
-			user = await vscode.window.showInputBox({
-				prompt: "Enter user name"
-			}) as string;
-		}
-		else {
-			user = configuration.get("user") as string;
-		}
+		host = await getConfigParamOfAskFor(configuration, "host", ASK_FOR_HOST);
+		user = await getConfigParamOfAskFor(configuration, "user", ASK_FOR_USER);
+
 		rootDir = configuration.get("rootDir", "~");
 
 		const input = await vscode.window.showInputBox({
@@ -95,8 +87,45 @@ export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(disposable);
 
-	disposable = vscode.commands.registerCommand("extension.uploadToRemote", () => {
-		notify("Upload To Remote");
+	disposable = vscode.commands.registerCommand("extension.uploadToRemote", async () => {
+		const configuration = vscode.workspace.getConfiguration("remote");
+		let host = await getConfigParamOfAskFor(configuration, "host", ASK_FOR_HOST);
+		let user = await getConfigParamOfAskFor(configuration, "user", ASK_FOR_USER);
+
+		let textEditor: vscode.TextEditor;
+		if (vscode.window.activeTextEditor) {
+			textEditor = vscode.window.activeTextEditor;
+		}
+		else {
+			vscode.window.showInformationMessage("No active document");
+			return;
+		}
+
+		const localFileName = textEditor.document.fileName;
+
+		let remoteDir: string;
+		if (configuration.has("rootDir")) {
+			remoteDir = configuration.get("rootDir") as string;
+			let relativePath = vscode.workspace.asRelativePath(localFileName);
+			relativePath = relativePath.replace("\\", "/");
+			remoteDir = `${remoteDir}/${relativePath}`;
+		}
+		else {
+			let input = await vscode.window.showInputBox({
+				prompt: "Enter remote directory: "
+			}) as string;
+			if (!input) {
+				return;
+			}
+			remoteDir = input as string;
+		}
+		notify(`remoteDir = ${remoteDir}`);
+		
+		try {
+			await upload(host, user, localFileName, remoteDir);
+		} catch(error) {
+			vscode.window.showErrorMessage(error);
+		}
 	});
 
 	context.subscriptions.push(disposable);
@@ -113,7 +142,7 @@ async function getFromRemote(host: string, user: string,	localDir: string,
 
 function notify(message: string) {
 	console.log(message);
-	vscode.window.showInformationMessage(message);
+	//vscode.window.showInformationMessage(message);
 }
 
 function mkdirIfNotExist(dirname: string) {
@@ -127,6 +156,21 @@ function download(host: string, user: string, localDir: string,
 		const scp = new sshClient.SCP({hostname: host, user: user});
 		return new Promise((resolve, reject) => {
 			scp.download(remoteFile, localDir, (result: any) => {
+				notify("result = " + result);
+				if (result.exitCode === 0) {
+					resolve(result.stdout);
+				}
+				else {
+					reject(result.stderr);
+				}
+			});
+		});
+}
+
+function upload(host: string, user: string, localFile: string, remoteDir: string) { 
+	const scp = new sshClient.SCP({hostname: host, user: user});
+		return new Promise((resolve, reject) => {
+			scp.upload(localFile, remoteDir, (result: any) => {
 				notify("result = " + result);
 				if (result.exitCode === 0) {
 					resolve(result.stdout);
@@ -162,5 +206,17 @@ function splitRemotePath(pathStr: string): Path {
 			dirname: "",
 			filename: pathStr
 		}
+	}
+}
+
+async function getConfigParamOfAskFor(configuration: vscode.WorkspaceConfiguration,
+		paramName: string, askMessage: string) {
+	if (!configuration.has(paramName)) {
+		return await vscode.window.showInputBox({
+			prompt: askMessage
+		}) as string;
+	}
+	else {
+		return configuration.get(paramName) as string;
 	}
 }
