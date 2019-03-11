@@ -123,6 +123,8 @@ export function activate(context: vscode.ExtensionContext) {
 		
 		try {
 			await upload(host, user, localFileName, remoteDir);
+			vscode.window.showInformationMessage(
+				`Uploaded to ${remoteDir}/${localFileName}`);
 		} catch(error) {
 			vscode.window.showErrorMessage(error);
 		}
@@ -152,34 +154,34 @@ function mkdirIfNotExist(dirname: string) {
 }
 
 function download(host: string, user: string, localDir: string,
-	remoteFile: string) {
-		const scp = new sshClient.SCP({hostname: host, user: user});
-		return new Promise((resolve, reject) => {
-			scp.download(remoteFile, localDir, (result: any) => {
-				notify("result = " + result);
-				if (result.exitCode === 0) {
-					resolve(result.stdout);
-				}
-				else {
-					reject(result.stderr);
-				}
-			});
+		remoteFile: string) {
+	const scp = new sshClient.SCP({hostname: host, user: user});
+	return new Promise((resolve, reject) => {
+		scp.download(remoteFile, localDir, (result: any) => {
+			notify("result = " + result);
+			if (result.exitCode === 0) {
+				resolve(result.stdout);
+			}
+			else {
+				reject(result.stderr);
+			}
 		});
+	});
 }
 
 function upload(host: string, user: string, localFile: string, remoteDir: string) { 
 	const scp = new sshClient.SCP({hostname: host, user: user});
-		return new Promise((resolve, reject) => {
-			scp.upload(localFile, remoteDir, (result: any) => {
-				notify("result = " + result);
-				if (result.exitCode === 0) {
-					resolve(result.stdout);
-				}
-				else {
-					reject(result.stderr);
-				}
-			});
+	return new Promise((resolve, reject) => {
+		scp.upload(localFile, remoteDir, (result: any) => {
+			notify("result = " + result);
+			if (result.exitCode === 0) {
+				resolve(result.stdout);
+			}
+			else {
+				reject(result.stderr);
+			}
 		});
+	});
 }
 
 function isAbsolute(path: string) {
