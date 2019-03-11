@@ -10,15 +10,15 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onCommand:extension.openRemote",
+		"onCommand:extension.downloadRemote",
 		"onCommand:extension.uploadToRemote"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
 		"commands": [
 			{
-				"command": "extension.openRemote",
-				"title": "Open Remote File",
+				"command": "extension.downloadRemote",
+				"title": "Download Remote File",
 				"category": "Remote Edit"
 			},
 			{
@@ -33,7 +33,17 @@
 					"command": "extension.uploadToRemote"
 				}
 			]
-		}
+		},
+		"keybindings": [
+			{
+				"command": "extension.downloadRemote",
+				"key": "ctrl+alt+r"
+			},
+			{
+				"command": "extension.uploadToRemote",
+				"key": "ctrl+alt+u"
+			}
+		]
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",

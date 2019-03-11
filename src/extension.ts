@@ -6,22 +6,19 @@ import * as path from "path";
 import { TextDecoder } from "util";
 const sshClient: any = require("node-sshclient");
 
+// Constants
+const REMOTE_SEPARATOR = "/";
+
 // Messages
 const ASK_FOR_HOST = "Enter host name: ";
 const ASK_FOR_USER = "Enter user name: ";
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
 		console.log('Congratulations, your extension "remote-edit" is now active!');
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('extension.openRemote', async () => {
+
+	let disposable = vscode.commands.registerCommand('extension.downloadRemote', async () => {
 		let host: string;
 		let user: string;
 		let rootDir: string;
@@ -43,7 +40,8 @@ export function activate(context: vscode.ExtensionContext) {
 		console.log(`Remote path is ${remotePath}`);
 
 		let remoteFilePath = 
-			pathIsAbsolute ? remotePath : `${rootDir}/${remotePath}`;
+			pathIsAbsolute ? remotePath : 
+				`${rootDir}${REMOTE_SEPARATOR}${remotePath}`;
 		console.log(`Host is ${host}`);
 		console.log(`User is ${user}`);
 		console.log(`Remote root directory is ${rootDir}`);
@@ -101,14 +99,16 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 
-		const localFileName = textEditor.document.fileName;
+		const localFilePath = textEditor.document.fileName;
+		//const fileName = splitPath(localFilePath, path.sep).filename;
 
-		let remoteDir: string;
+		let remotePath: string;
 		if (configuration.has("rootDir")) {
-			remoteDir = configuration.get("rootDir") as string;
-			let relativePath = vscode.workspace.asRelativePath(localFileName);
-			relativePath = relativePath.replace("\\", "/");
-			remoteDir = `${remoteDir}/${relativePath}`;
+			remotePath = configuration.get("rootDir") as string;
+			let relativePath = vscode.workspace.asRelativePath(localFilePath);
+			relativePath = relativePath.replace(path.sep, REMOTE_SEPARATOR);
+			//relativePath = splitRemotePath(relativePath).dirname;
+			remotePath = `${remotePath}${REMOTE_SEPARATOR}${relativePath}`;
 		}
 		else {
 			let input = await vscode.window.showInputBox({
@@ -117,14 +117,14 @@ export function activate(context: vscode.ExtensionContext) {
 			if (!input) {
 				return;
 			}
-			remoteDir = input as string;
+			remotePath = input as string;
 		}
-		notify(`remoteDir = ${remoteDir}`);
+		notify(`remotePath = ${remotePath}`);
 		
 		try {
-			await upload(host, user, localFileName, remoteDir);
+			await upload(host, user, localFilePath, remotePath);
 			vscode.window.showInformationMessage(
-				`Uploaded to ${remoteDir}/${localFileName}`);
+				`Uploaded to ${remotePath}`);
 		} catch(error) {
 			vscode.window.showErrorMessage(error);
 		}
@@ -185,7 +185,7 @@ function upload(host: string, user: string, localFile: string, remoteDir: string
 }
 
 function isAbsolute(path: string) {
-	return path.startsWith("/");
+	return path.startsWith(REMOTE_SEPARATOR);
 }
 
 interface Path {
@@ -193,8 +193,12 @@ interface Path {
 	filename: string
 }
 
-function splitRemotePath(pathStr: string): Path {
-	const lastPathSepIndex = pathStr.lastIndexOf("/");
+function splitRemotePath(pathStr: string) {
+	return splitPath(pathStr, REMOTE_SEPARATOR);
+}
+
+function splitPath(pathStr: string, separator: string): Path {
+	const lastPathSepIndex = pathStr.lastIndexOf(separator);
 	if (lastPathSepIndex >= 0) {
 		const dirname = pathStr.slice(0, lastPathSepIndex);
 		const filename = pathStr.substr(lastPathSepIndex + 1);
